@@ -938,13 +938,15 @@ function scanFrame(){
   if(!scanning)return;
   const vid=document.getElementById('qr-vid');
   const cnv=document.getElementById('qr-cnv');
-  if(vid&&vid.readyState===vid.HAVE_ENOUGH_DATA){
-    cnv.width=vid.videoWidth; cnv.height=vid.videoHeight;
+  if(vid&&vid.readyState>=2&&vid.videoWidth>0&&vid.videoHeight>0){
+    if(cnv.width!==vid.videoWidth||cnv.height!==vid.videoHeight){
+      cnv.width=vid.videoWidth; cnv.height=vid.videoHeight;
+    }
     const ctx=cnv.getContext('2d');
     ctx.drawImage(vid,0,0);
-    const img=ctx.getImageData(0,0,cnv.width,cnv.height);
-    if(typeof jsQR!=='undefined'){
-      const qr=jsQR(img.data,img.width,img.height,{inversionAttempts:'dontInvert'});
+    const img=ctx.getImageData(0,0, cnv.width, cnv.height);
+    if(typeof jsQR==='function'){
+      const qr=jsQR(img.data, img.width, img.height, {inversionAttempts:'dontInvert'});
       if(qr){handleQR(qr.data);return;}
     }
   }
