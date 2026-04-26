@@ -1,0 +1,1072 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2FA ZOMA</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600&display=swap');
+
+:root {
+  --bg:     #07090d;
+  --bg2:    #0d1117;
+  --bg3:    #141a24;
+  --border: #1a2232;
+  --border2:#243044;
+  --accent: #00e5b8;
+  --red:    #ff4455;
+  --text:   #d8eaf8;
+  --text2:  #6688aa;
+  --text3:  #334455;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'IBM Plex Sans Arabic', sans-serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow-x: hidden;
+}
+
+/* ════════════════════════════════════════
+   LOCK SCREEN
+════════════════════════════════════════ */
+#lock-screen {
+  position: fixed; inset: 0; z-index: 9999;
+  background: var(--bg);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 32px;
+  transition: opacity 0.4s;
+}
+#lock-screen.fade-out { opacity: 0; pointer-events: none; }
+#lock-screen.gone     { display: none; }
+
+.lock-glow {
+  position: absolute;
+  width: 420px; height: 420px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(0,229,184,.08) 0%, transparent 65%);
+  animation: breathe 5s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes breathe {
+  0%,100% { transform: scale(1);    opacity:.5; }
+  50%      { transform: scale(1.2); opacity:1;  }
+}
+
+.lock-brand {
+  display: flex; flex-direction: column;
+  align-items: center; gap: 12px; position: relative;
+}
+
+.lock-shield {
+  width: 74px; height: 74px;
+  border: 2px solid var(--accent); border-radius: 22px;
+  display: flex; align-items: center; justify-content: center;
+  animation: shield-glow 3s ease-in-out infinite;
+}
+@keyframes shield-glow {
+  0%,100% { box-shadow: 0 0 0 0 rgba(0,229,184,.35); }
+  50%      { box-shadow: 0 0 0 14px rgba(0,229,184,0); }
+}
+
+.brand-name {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 24px; font-weight: 700;
+  letter-spacing: 4px; color: var(--text);
+}
+.brand-name span { color: var(--accent); }
+
+.brand-sub {
+  font-size: 11px; color: var(--text3);
+  font-family: 'IBM Plex Mono', monospace;
+  letter-spacing: 2px; text-transform: uppercase;
+}
+
+/* lock card */
+.lock-card {
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: 22px;
+  padding: 30px 34px;
+  width: min(370px, 92vw);
+  display: flex; flex-direction: column; gap: 14px;
+  position: relative;
+}
+
+.lock-card-label {
+  font-size: 13px; color: var(--text2);
+  font-family: 'IBM Plex Mono', monospace;
+  text-align: center; letter-spacing: .5px;
+}
+
+.pw-wrap { position: relative; display: flex; align-items: center; }
+.pw-wrap input {
+  width: 100%;
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: 12px;
+  padding: 14px 46px 14px 14px;
+  color: var(--text);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 18px; letter-spacing: 4px;
+  text-align: center; direction: ltr;
+  outline: none;
+  transition: border-color .2s, box-shadow .2s;
+}
+.pw-wrap input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(0,229,184,.1);
+}
+.pw-wrap input.shake {
+  animation: shake .4s ease;
+  border-color: var(--red);
+}
+@keyframes shake {
+  0%,100% { transform: translateX(0); }
+  20%      { transform: translateX(-8px); }
+  40%      { transform: translateX(8px); }
+  60%      { transform: translateX(-5px); }
+  80%      { transform: translateX(5px); }
+}
+.eye-btn {
+  position: absolute; left: 12px;
+  background: none; border: none;
+  cursor: pointer; color: var(--text3);
+  display: flex; padding: 4px;
+  transition: color .2s;
+}
+.eye-btn:hover { color: var(--text2); }
+
+/* attempt dots */
+.dots-row { display: flex; justify-content: center; gap: 7px; min-height: 14px; }
+.dot {
+  width: 9px; height: 9px; border-radius: 50%;
+  border: 1px solid var(--border2);
+  transition: all .3s;
+}
+.dot.used { background: var(--red); border-color: var(--red); }
+
+.lock-err {
+  font-size: 12px; color: var(--red);
+  text-align: center;
+  font-family: 'IBM Plex Mono', monospace;
+  min-height: 15px;
+}
+
+.btn-unlock {
+  padding: 14px; border: none; border-radius: 12px;
+  background: var(--accent); color: #000;
+  font-family: 'IBM Plex Sans Arabic', sans-serif;
+  font-size: 15px; font-weight: 600;
+  cursor: pointer; transition: opacity .2s, transform .1s;
+}
+.btn-unlock:hover  { opacity:.86; }
+.btn-unlock:active { transform: scale(.98); }
+
+.lock-foot {
+  font-size: 11px; color: var(--text3);
+  text-align: center;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+/* ════════════════════════════════════════
+   APP BLUR WRAPPER
+════════════════════════════════════════ */
+#app {
+  width: 100%;
+  display: flex; flex-direction: column; align-items: center;
+  filter: blur(20px);
+  pointer-events: none; user-select: none;
+  transition: filter .5s ease;
+}
+#app.unlocked { filter: none; pointer-events: auto; user-select: auto; }
+
+/* ════════════════════════════════════════
+   HEADER
+════════════════════════════════════════ */
+.header {
+  width: 100%; max-width: 700px;
+  padding: 28px 24px 14px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.logo { display: flex; align-items: center; gap: 10px; }
+.logo-mark {
+  width: 34px; height: 34px;
+  border: 1.5px solid var(--accent); border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+}
+.logo-text {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 17px; font-weight: 700;
+  letter-spacing: 2px;
+}
+.logo-text .z { color: var(--accent); }
+
+.hdr-right { display: flex; align-items: center; gap: 12px; }
+.clock-row {
+  display: flex; align-items: center; gap: 6px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px; color: var(--text2);
+}
+.pulse {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent);
+  animation: pulse 2s infinite;
+}
+@keyframes pulse {
+  0%,100% { opacity:1; transform:scale(1); }
+  50%      { opacity:.3; transform:scale(.7); }
+}
+.btn-lock {
+  background: none; border: 1px solid var(--border2);
+  border-radius: 8px; color: var(--text2);
+  cursor: pointer; padding: 6px 10px;
+  font-size: 11px; font-family: 'IBM Plex Mono', monospace;
+  display: flex; align-items: center; gap: 5px;
+  transition: all .2s;
+}
+.btn-lock:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ════════════════════════════════════════
+   ACCOUNTS
+════════════════════════════════════════ */
+.main {
+  width: 100%; max-width: 700px;
+  padding: 0 24px 40px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.aclist { display: flex; flex-direction: column; gap: 10px; }
+
+.ac-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 16px; padding: 18px 20px;
+  display: flex; align-items: center; gap: 16px;
+  cursor: pointer;
+  transition: border-color .2s;
+  position: relative; overflow: hidden;
+}
+.ac-card:hover  { border-color: var(--border2); }
+.ac-card.copied { border-color: var(--accent); }
+
+.av {
+  width: 42px; height: 42px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 600; flex-shrink: 0;
+  font-family: 'IBM Plex Mono', monospace; text-transform: uppercase;
+}
+.ac-info { flex: 1; min-width: 0; }
+.ac-name {
+  font-size: 13px; font-weight: 500; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ac-issuer { font-size: 11px; color: var(--text2); font-family: 'IBM Plex Mono', monospace; }
+
+.code-area { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.otp-code {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 26px; font-weight: 600;
+  letter-spacing: 4px; color: var(--accent); direction: ltr;
+}
+.otp-code.exp { color: #ff9900; }
+
+.tring { position: relative; width: 36px; height: 36px; flex-shrink: 0; }
+.tring svg { transform: rotate(-90deg); }
+.tr { fill: none; stroke: var(--border2); stroke-width: 3; }
+.tp {
+  fill: none; stroke: var(--accent);
+  stroke-width: 3; stroke-linecap: round;
+  transition: stroke-dashoffset 1s linear, stroke .3s;
+}
+.tp.exp { stroke: #ff9900; }
+.tlabel {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--text2);
+}
+
+.del-btn {
+  background: none; border: none; color: var(--text3);
+  cursor: pointer; padding: 6px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; opacity: 0; transition: all .2s;
+}
+.ac-card:hover .del-btn { opacity: 1; }
+.del-btn:hover { color: var(--red); background: rgba(255,68,85,.1); }
+
+/* empty */
+.empty {
+  text-align: center; padding: 48px 24px;
+  display: flex; flex-direction: column;
+  align-items: center; gap: 10px;
+}
+.empty-ico {
+  width: 60px; height: 60px;
+  border: 1px solid var(--border2); border-radius: 16px;
+  display: flex; align-items: center; justify-content: center;
+}
+.empty p     { color: var(--text2); font-size: 14px; }
+.empty small { color: var(--text3); font-size: 12px; font-family: 'IBM Plex Mono', monospace; }
+
+/* add button */
+.add-btn {
+  display: flex; align-items: center;
+  justify-content: center; gap: 8px;
+  padding: 14px;
+  border: 1px dashed var(--border2); border-radius: 14px;
+  background: transparent; color: var(--text2);
+  font-family: 'IBM Plex Sans Arabic', sans-serif;
+  font-size: 14px; cursor: pointer;
+  transition: all .2s; width: 100%;
+}
+.add-btn:hover {
+  border-color: var(--accent); color: var(--accent);
+  background: rgba(0,229,184,.04);
+}
+.add-ico {
+  width: 20px; height: 20px;
+  border: 1.5px solid currentColor; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 17px; flex-shrink: 0;
+}
+.divider { height: 1px; background: var(--border); margin: 2px 0; }
+.foot-note {
+  font-size: 11px; color: var(--text3);
+  font-family: 'IBM Plex Mono', monospace;
+  text-align: center; letter-spacing: .5px;
+}
+
+/* ════════════════════════════════════════
+   ADD MODAL
+════════════════════════════════════════ */
+.overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.9);
+  display: none; align-items: center;
+  justify-content: center; z-index: 1000;
+}
+.overlay.open { display: flex; }
+
+.modal {
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: 20px; padding: 28px;
+  width: min(500px, 94vw);
+  display: flex; flex-direction: column; gap: 16px;
+}
+.modal-hd {
+  font-size: 15px; font-weight: 500;
+  display: flex; align-items: center; gap: 8px;
+}
+.modal-hd::before {
+  content: ''; width: 3px; height: 16px;
+  background: var(--accent); border-radius: 2px;
+}
+
+/* tabs */
+.tabs {
+  display: flex; gap: 5px;
+  background: var(--bg3); border-radius: 10px; padding: 4px;
+}
+.tbtn {
+  flex: 1; padding: 9px; border: none;
+  border-radius: 8px; background: transparent;
+  color: var(--text2);
+  font-family: 'IBM Plex Sans Arabic', sans-serif;
+  font-size: 13px; cursor: pointer;
+  display: flex; align-items: center;
+  justify-content: center; gap: 6px;
+  transition: all .2s;
+}
+.tbtn.on {
+  background: var(--bg2); color: var(--accent);
+  border: 1px solid var(--border2);
+}
+
+/* qr panel */
+#qp {
+  display: flex; flex-direction: column;
+  align-items: center; gap: 12px;
+}
+.cam-box {
+  position: relative; width: 100%; max-width: 300px;
+  aspect-ratio: 1; border-radius: 14px;
+  overflow: hidden; border: 1px solid var(--border2);
+  background: #000;
+}
+#qr-vid {
+  width: 100%; height: 100%;
+  object-fit: cover; display: block;
+}
+
+/* scanner corners */
+.sf { position: absolute; inset: 0; pointer-events: none; }
+.sf::before, .sf::after {
+  content: ''; position: absolute;
+  width: 34px; height: 34px;
+  border-color: var(--accent); border-style: solid;
+}
+.sf::before {
+  top: 12px; right: 12px;
+  border-width: 2.5px 2.5px 0 0; border-radius: 0 6px 0 0;
+}
+.sf::after {
+  bottom: 12px; left: 12px;
+  border-width: 0 0 2.5px 2.5px; border-radius: 0 0 0 6px;
+}
+.sc-tl {
+  position: absolute; top: 12px; left: 12px;
+  width: 34px; height: 34px;
+  border: 2.5px solid transparent;
+  border-top-color: var(--accent); border-left-color: var(--accent);
+  border-radius: 6px 0 0 0;
+}
+.sc-br {
+  position: absolute; bottom: 12px; right: 12px;
+  width: 34px; height: 34px;
+  border: 2.5px solid transparent;
+  border-bottom-color: var(--accent); border-right-color: var(--accent);
+  border-radius: 0 0 6px 0;
+}
+.scan-beam {
+  position: absolute; left: 14px; right: 14px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  animation: beam 2.2s ease-in-out infinite;
+}
+@keyframes beam {
+  0%,100% { top: 15%; } 50% { top: 82%; }
+}
+
+.cam-msg {
+  font-size: 12px; font-family: 'IBM Plex Mono', monospace;
+  color: var(--text2); text-align: center;
+}
+.cam-msg.ok  { color: var(--accent); }
+.cam-msg.bad { color: var(--red); }
+#qr-cnv { display: none; }
+
+/* manual panel */
+#mp { display: none; flex-direction: column; gap: 12px; }
+.fld { display: flex; flex-direction: column; gap: 6px; }
+.fld label {
+  font-size: 12px; color: var(--text2);
+  font-family: 'IBM Plex Mono', monospace; letter-spacing: .5px;
+}
+.fld input {
+  background: var(--bg3); border: 1px solid var(--border2);
+  border-radius: 10px; padding: 12px 14px;
+  color: var(--text); font-family: 'IBM Plex Mono', monospace;
+  font-size: 14px; outline: none;
+  transition: border-color .2s; width: 100%; direction: ltr;
+}
+.fld input:focus  { border-color: var(--accent); }
+.fld input::placeholder { color: var(--text3); }
+
+.err-msg {
+  font-size: 12px; color: var(--red); display: none;
+  padding: 8px 12px;
+  background: rgba(255,68,85,.08); border-radius: 8px;
+  border: 1px solid rgba(255,68,85,.2);
+}
+
+.m-actions { display: flex; gap: 10px; }
+.btn-ok {
+  flex: 1; padding: 12px; border: none; border-radius: 10px;
+  background: var(--accent); color: #000;
+  font-family: 'IBM Plex Sans Arabic', sans-serif;
+  font-size: 14px; font-weight: 600;
+  cursor: pointer; transition: opacity .2s;
+}
+.btn-ok:hover { opacity: .85; }
+.btn-cancel {
+  padding: 12px 20px; background: transparent;
+  border: 1px solid var(--border2); border-radius: 10px;
+  color: var(--text2);
+  font-family: 'IBM Plex Sans Arabic', sans-serif;
+  font-size: 14px; cursor: pointer; transition: all .2s;
+}
+.btn-cancel:hover { border-color: var(--red); color: var(--red); }
+
+/* ════════════════════════════════════════
+   TOASTS
+════════════════════════════════════════ */
+.toast {
+  position: fixed; bottom: 24px; left: 50%;
+  transform: translateX(-50%) translateY(60px);
+  padding: 10px 22px; border-radius: 30px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 13px; font-weight: 600;
+  transition: transform .35s cubic-bezier(.34,1.56,.64,1);
+  z-index: 8000; white-space: nowrap;
+  pointer-events: none;
+}
+.toast.show { transform: translateX(-50%) translateY(0); }
+#t-copy { background: var(--accent); color: #000; }
+#t-qr   { background: var(--accent); color: #000; }
+#t-bad  { background: var(--red);    color: #fff; }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════
+     LOCK SCREEN
+══════════════════════════════════════ -->
+<div id="lock-screen">
+  <div class="lock-glow"></div>
+
+  <div class="lock-brand">
+    <div class="lock-shield">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none"
+           stroke="#00e5b8" stroke-width="1.6">
+        <path d="M12 2l7 4v6c0 5.25-4 8.75-7 10-3-1.25-7-4.75-7-10V6l7-4z"/>
+        <path d="M9 12l2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <div class="brand-name">2FA <span>ZOMA</span></div>
+    <div class="brand-sub">Secure · Offline · Private</div>
+  </div>
+
+  <div class="lock-card">
+    <div class="lock-card-label" id="lk-lbl">أدخل كلمة المرور</div>
+
+    <div class="pw-wrap">
+      <input type="password" id="pw-inp" placeholder="••••••••"
+             maxlength="128" autocomplete="current-password" />
+      <button class="eye-btn" onclick="togglePwEye()">
+        <svg id="eye-svg" width="16" height="16" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/>
+          <circle cx="12" cy="12" r="3"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="dots-row" id="dots"></div>
+    <div class="lock-err" id="lk-err"></div>
+
+    <button class="btn-unlock" id="btn-ulk" onclick="tryUnlock()">فتح القفل</button>
+    <div class="lock-foot">لا سيرفر · البيانات محفوظة على جهازك فقط</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     APP (blurred till unlock)
+══════════════════════════════════════ -->
+<div id="app">
+
+  <div class="header">
+    <div class="logo">
+      <div class="logo-mark">
+        <svg width="18" height="18" viewBox="0 0 24 24"
+             fill="none" stroke="#00e5b8" stroke-width="2">
+          <path d="M12 2l7 4v6c0 5-4 8.5-7 10C9 20.5 5 17 5 12V6l7-4z"/>
+        </svg>
+      </div>
+      <div class="logo-text">2FA <span class="z">ZOMA</span></div>
+    </div>
+    <div class="hdr-right">
+      <div class="clock-row">
+        <div class="pulse"></div>
+        <span id="clk">--:--:--</span>
+      </div>
+      <button class="btn-lock" onclick="lockApp()">
+        <svg width="11" height="11" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="2.2">
+          <rect x="3" y="11" width="18" height="11" rx="2"/>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        </svg>
+        قفل
+      </button>
+    </div>
+  </div>
+
+  <div class="main">
+    <div id="aclist" class="aclist"></div>
+
+    <div id="empty" class="empty" style="display:none">
+      <div class="empty-ico">
+        <svg width="26" height="26" viewBox="0 0 24 24"
+             fill="none" stroke="#334455" stroke-width="1.5">
+          <rect x="3" y="11" width="18" height="11" rx="2"/>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          <circle cx="12" cy="16" r="1.5"/>
+        </svg>
+      </div>
+      <p>لا يوجد حسابات بعد</p>
+      <small>اضغط زر الإضافة لتبدأ</small>
+    </div>
+
+    <div class="divider"></div>
+
+    <button class="add-btn" onclick="openModal()">
+      <div class="add-ico">+</div>
+      إضافة حساب جديد
+    </button>
+
+    <div class="foot-note">
+      بيانات محلية فقط · لا إنترنت · لا سيرفر
+    </div>
+  </div>
+
+</div>
+
+<!-- ══════════════════════════════════════
+     ADD MODAL
+══════════════════════════════════════ -->
+<div class="overlay" id="modal">
+  <div class="modal">
+    <div class="modal-hd">إضافة حساب</div>
+
+    <div class="tabs">
+      <button class="tbtn on" id="tqr" onclick="switchTab('qr')">
+        <svg width="13" height="13" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+          <rect x="3" y="14" width="7" height="7"/>
+          <rect x="14" y="14" width="3" height="3"/><rect x="18" y="18" width="3" height="3"/>
+          <rect x="14" y="18" width="3" height="3"/><rect x="18" y="14" width="3" height="3"/>
+        </svg>
+        مسح QR بالكاميرا
+      </button>
+      <button class="tbtn" id="tman" onclick="switchTab('man')">
+        <svg width="13" height="13" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 20h9"/>
+          <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/>
+        </svg>
+        إدخال يدوي
+      </button>
+    </div>
+
+    <!-- QR panel -->
+    <div id="qp">
+      <div class="cam-box">
+        <video id="qr-vid" autoplay muted playsinline></video>
+        <div class="sf">
+          <div class="sc-tl"></div>
+          <div class="sc-br"></div>
+          <div class="scan-beam"></div>
+        </div>
+      </div>
+      <canvas id="qr-cnv"></canvas>
+      <div class="cam-msg" id="cam-msg">جاري تشغيل الكاميرا…</div>
+    </div>
+
+    <!-- Manual panel -->
+    <div id="mp">
+      <div class="fld">
+        <label>اسم الحساب</label>
+        <input type="text" id="i-name" placeholder="مثال: user@gmail.com" />
+      </div>
+      <div class="fld">
+        <label>اسم الخدمة (اختياري)</label>
+        <input type="text" id="i-issuer" placeholder="مثال: Google، GitHub" />
+      </div>
+      <div class="fld">
+        <label>المفتاح السري — Secret Key</label>
+        <input type="text" id="i-secret"
+               placeholder="JBSWY3DPEHPK3PXP" autocomplete="off" />
+      </div>
+      <div class="err-msg" id="err-msg">المفتاح السري غير صحيح</div>
+    </div>
+
+    <div class="m-actions" id="m-acts">
+      <button class="btn-cancel" onclick="closeModal()">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="t-copy">تم النسخ ✓</div>
+<div class="toast" id="t-qr">تم مسح QR بنجاح ✓</div>
+<div class="toast" id="t-bad">QR غير صالح</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
+<script>
+/* ══════════════════════════════════════════
+   LOCK SYSTEM
+══════════════════════════════════════════ */
+const MAX_ATT = 5;
+let attLeft   = MAX_ATT;
+let firstTime = !localStorage.getItem('zoma_ph');
+
+async function sha256(s) {
+  const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+  return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');
+}
+
+function buildDots() {
+  const el = document.getElementById('dots');
+  el.innerHTML = '';
+  if (firstTime) return;
+  for (let i=0; i<MAX_ATT; i++) {
+    const d = document.createElement('div');
+    d.className = 'dot' + (i>=attLeft?' used':'');
+    el.appendChild(d);
+  }
+}
+
+function setupLock() {
+  document.getElementById('lk-lbl').textContent =
+    firstTime ? 'أنشئ كلمة مرور للتطبيق' : 'أدخل كلمة المرور';
+  document.getElementById('btn-ulk').textContent =
+    firstTime ? 'تعيين كلمة المرور' : 'فتح القفل';
+  buildDots();
+  setTimeout(() => document.getElementById('pw-inp').focus(), 100);
+}
+
+async function tryUnlock() {
+  const pw  = document.getElementById('pw-inp').value;
+  const err = document.getElementById('lk-err');
+  if (!pw) return;
+
+  if (firstTime) {
+    if (pw.length < 4) { err.textContent='يجب أن تكون 4 أحرف على الأقل'; return; }
+    localStorage.setItem('zoma_ph', await sha256(pw));
+    firstTime = false;
+    doUnlock();
+  } else {
+    const h = await sha256(pw);
+    if (h === localStorage.getItem('zoma_ph')) {
+      doUnlock();
+    } else {
+      attLeft--;
+      buildDots();
+      const inp = document.getElementById('pw-inp');
+      inp.value = '';
+      inp.classList.add('shake');
+      setTimeout(() => inp.classList.remove('shake'), 450);
+      if (attLeft <= 0) {
+        err.textContent = 'تم استنفاد المحاولات — أعد تحميل الصفحة';
+        document.getElementById('btn-ulk').disabled = true;
+        inp.disabled = true;
+      } else {
+        err.textContent = `كلمة مرور خاطئة — ${attLeft} محاولات متبقية`;
+      }
+    }
+  }
+}
+
+function doUnlock() {
+  const ls = document.getElementById('lock-screen');
+  ls.classList.add('fade-out');
+  document.getElementById('app').classList.add('unlocked');
+  setTimeout(() => ls.classList.add('gone'), 430);
+}
+
+function lockApp() {
+  attLeft = MAX_ATT; firstTime = false;
+  stopCam(); closeModal();
+  const inp = document.getElementById('pw-inp');
+  inp.value = ''; inp.disabled = false;
+  document.getElementById('lk-err').textContent = '';
+  document.getElementById('btn-ulk').disabled = false;
+  const ls = document.getElementById('lock-screen');
+  ls.classList.remove('fade-out','gone');
+  document.getElementById('app').classList.remove('unlocked');
+  buildDots();
+  setTimeout(() => inp.focus(), 100);
+}
+
+function togglePwEye() {
+  const inp = document.getElementById('pw-inp');
+  const svg = document.getElementById('eye-svg');
+  if (inp.type==='password') {
+    inp.type = 'text';
+    svg.innerHTML = `<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+      <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+      <line x1="1" y1="1" x2="23" y2="23"/>`;
+  } else {
+    inp.type = 'password';
+    svg.innerHTML = `<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/>`;
+  }
+}
+
+document.getElementById('pw-inp').addEventListener('keydown', e => {
+  if (e.key==='Enter') tryUnlock();
+});
+
+/* ══════════════════════════════════════════
+   TOTP ENGINE
+══════════════════════════════════════════ */
+const COLS = [
+  {bg:'rgba(0,229,184,.13)',   c:'#00e5b8'},
+  {bg:'rgba(0,170,255,.13)',   c:'#00aaff'},
+  {bg:'rgba(255,107,53,.13)',  c:'#ff6b35'},
+  {bg:'rgba(168,85,247,.13)', c:'#a855f7'},
+  {bg:'rgba(245,200,66,.13)', c:'#f5c842'},
+  {bg:'rgba(244,63,94,.13)',   c:'#f43f5e'},
+];
+
+let accounts = JSON.parse(localStorage.getItem('2fa_ac')||'[]');
+function save() { localStorage.setItem('2fa_ac', JSON.stringify(accounts)); }
+
+function b32dec(s) {
+  const a='ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  s=s.toUpperCase().replace(/=+$/,'').replace(/\s/g,'');
+  let bits=0,val=0,idx=0;
+  const out=new Uint8Array(Math.floor(s.length*5/8));
+  for(let i=0;i<s.length;i++){
+    const c=a.indexOf(s[i]);
+    if(c<0) throw new Error('bad');
+    val=(val<<5)|c; bits+=5;
+    if(bits>=8){bits-=8;out[idx++]=(val>>>bits)&0xff;}
+  }
+  return out;
+}
+
+async function hmac1(key,data){
+  const k=await crypto.subtle.importKey('raw',key,{name:'HMAC',hash:'SHA-1'},false,['sign']);
+  return new Uint8Array(await crypto.subtle.sign('HMAC',k,data));
+}
+
+async function genTOTP(secret){
+  const key=b32dec(secret);
+  const ctr=Math.floor(Date.now()/1000/30);
+  const buf=new DataView(new ArrayBuffer(8));
+  buf.setUint32(4,ctr,false);
+  const h=await hmac1(key,buf.buffer);
+  const off=h[19]&0xf;
+  const code=((h[off]&0x7f)<<24)|((h[off+1]&0xff)<<16)|
+             ((h[off+2]&0xff)<<8)|(h[off+3]&0xff);
+  return String(code%1000000).padStart(6,'0');
+}
+
+function remSec(){ return 30-(Math.floor(Date.now()/1000)%30); }
+function valSec(s){ try{b32dec(s);return s.length>=8;}catch{return false;} }
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+async function render(){
+  const list=document.getElementById('aclist');
+  const empty=document.getElementById('empty');
+  list.innerHTML='';
+  if(!accounts.length){empty.style.display='flex';return;}
+  empty.style.display='none';
+
+  const C=2*Math.PI*15, rem=remSec(), exp=rem<=7;
+  const off=C*(1-rem/30);
+
+  for(let i=0;i<accounts.length;i++){
+    const ac=accounts[i], col=COLS[i%COLS.length];
+    let code='------';
+    try{code=await genTOTP(ac.secret);}catch{}
+
+    const card=document.createElement('div');
+    card.className='ac-card';
+    card.innerHTML=`
+      <div class="av" style="background:${col.bg};color:${col.c}">
+        ${esc((ac.name||'?').slice(0,2)).toUpperCase()}
+      </div>
+      <div class="ac-info">
+        <div class="ac-name">${esc(ac.name)}</div>
+        ${ac.issuer?`<div class="ac-issuer">${esc(ac.issuer)}</div>`:''}
+      </div>
+      <div class="code-area">
+        <div class="otp-code${exp?' exp':''}">${code.slice(0,3)} ${code.slice(3)}</div>
+        <div class="tring">
+          <svg width="36" height="36" viewBox="0 0 36 36">
+            <circle class="tr" cx="18" cy="18" r="15"/>
+            <circle class="tp${exp?' exp':''}" cx="18" cy="18" r="15"
+              stroke-dasharray="${C}" stroke-dashoffset="${off}"/>
+          </svg>
+          <div class="tlabel">${rem}</div>
+        </div>
+        <button class="del-btn" title="حذف">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="2">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6l-1 14H6L5 6"/>
+            <path d="M10 11v6M14 11v6"/>
+          </svg>
+        </button>
+      </div>`;
+
+    card.addEventListener('click',e=>{
+      if(e.target.closest('.del-btn'))return;
+      navigator.clipboard?.writeText(code.replace(' ','')).catch(()=>{});
+      card.classList.add('copied');
+      setTimeout(()=>card.classList.remove('copied'),600);
+      toast('t-copy');
+    });
+    card.querySelector('.del-btn').addEventListener('click',e=>{
+      e.stopPropagation();
+      accounts.splice(i,1); save(); render();
+    });
+    list.appendChild(card);
+  }
+}
+
+/* ══════════════════════════════════════════
+   QR CAMERA SCANNER
+══════════════════════════════════════════ */
+let stream=null, scanning=false;
+
+async function startCam(){
+  const msg=document.getElementById('cam-msg');
+  msg.textContent='جاري تشغيل الكاميرا…';
+  msg.className='cam-msg';
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:'environment',width:{ideal:640},height:{ideal:640}}
+    });
+    const vid=document.getElementById('qr-vid');
+    vid.srcObject=stream;
+    await vid.play();
+    msg.textContent='وجّه الكاميرا نحو رمز QR الخاص بالخدمة';
+    scanning=true;
+    requestAnimationFrame(scanFrame);
+  }catch(e){
+    msg.textContent='تعذّر الوصول للكاميرا — استخدم الإدخال اليدوي';
+    msg.className='cam-msg bad';
+  }
+}
+
+function stopCam(){
+  scanning=false;
+  if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}
+  const v=document.getElementById('qr-vid');
+  if(v) v.srcObject=null;
+}
+
+function scanFrame(){
+  if(!scanning)return;
+  const vid=document.getElementById('qr-vid');
+  const cnv=document.getElementById('qr-cnv');
+  if(vid&&vid.readyState===vid.HAVE_ENOUGH_DATA){
+    cnv.width=vid.videoWidth; cnv.height=vid.videoHeight;
+    const ctx=cnv.getContext('2d');
+    ctx.drawImage(vid,0,0);
+    const img=ctx.getImageData(0,0,cnv.width,cnv.height);
+    if(typeof jsQR!=='undefined'){
+      const qr=jsQR(img.data,img.width,img.height,{inversionAttempts:'dontInvert'});
+      if(qr){handleQR(qr.data);return;}
+    }
+  }
+  requestAnimationFrame(scanFrame);
+}
+
+function handleQR(data){
+  scanning=false;
+  const msg=document.getElementById('cam-msg');
+  try{
+    const url=new URL(data);
+    if(url.protocol!=='otpauth:') throw new Error('bad');
+    const label=decodeURIComponent(url.pathname.replace(/^\//,''));
+    const secret=url.searchParams.get('secret');
+    if(!secret||!valSec(secret)) throw new Error('no secret');
+    let issuer=url.searchParams.get('issuer')||'', name=label;
+    if(label.includes(':')){
+      const p=label.split(':');
+      if(!issuer) issuer=p[0].trim();
+      name=p[1].trim();
+    }
+    accounts.push({name,issuer,secret:secret.toUpperCase()});
+    save(); stopCam();
+    msg.textContent='تم مسح QR بنجاح ✓';
+    msg.className='cam-msg ok';
+    toast('t-qr');
+    setTimeout(()=>{closeModal();render();},700);
+  }catch(e){
+    msg.textContent='رمز QR غير صالح — جرّب الإدخال اليدوي';
+    msg.className='cam-msg bad';
+    toast('t-bad');
+    setTimeout(()=>{
+      if(!scanning&&stream){scanning=true;requestAnimationFrame(scanFrame);}
+    },1800);
+  }
+}
+
+/* ══════════════════════════════════════════
+   MODAL
+══════════════════════════════════════════ */
+let curTab='qr';
+
+function openModal(){
+  document.getElementById('modal').classList.add('open');
+  switchTab('qr');
+}
+
+function closeModal(){
+  document.getElementById('modal').classList.remove('open');
+  stopCam();
+  ['i-name','i-issuer','i-secret'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('err-msg').style.display='none';
+  document.getElementById('cam-msg').textContent='';
+  document.getElementById('cam-msg').className='cam-msg';
+}
+
+function switchTab(t){
+  curTab=t;
+  document.getElementById('tqr').classList.toggle('on',t==='qr');
+  document.getElementById('tman').classList.toggle('on',t==='man');
+  const qp=document.getElementById('qp');
+  const mp=document.getElementById('mp');
+  const acts=document.getElementById('m-acts');
+  if(t==='qr'){
+    qp.style.display='flex'; mp.style.display='none';
+    acts.innerHTML=`<button class="btn-cancel" onclick="closeModal()">إلغاء</button>`;
+    startCam();
+  }else{
+    stopCam();
+    qp.style.display='none'; mp.style.display='flex';
+    acts.innerHTML=`
+      <button class="btn-ok" onclick="addManual()">إضافة</button>
+      <button class="btn-cancel" onclick="closeModal()">إلغاء</button>`;
+    document.getElementById('i-name').focus();
+  }
+}
+
+function addManual(){
+  const name  =document.getElementById('i-name').value.trim();
+  const issuer=document.getElementById('i-issuer').value.trim();
+  const secret=document.getElementById('i-secret').value.trim().replace(/\s/g,'');
+  const err   =document.getElementById('err-msg');
+  if(!name){document.getElementById('i-name').focus();return;}
+  if(!valSec(secret)){err.style.display='block';document.getElementById('i-secret').focus();return;}
+  err.style.display='none';
+  accounts.push({name,issuer,secret:secret.toUpperCase()});
+  save(); closeModal(); render();
+}
+
+/* ══════════════════════════════════════════
+   UTILS
+══════════════════════════════════════════ */
+function toast(id){
+  const el=document.getElementById(id);
+  el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'),2200);
+}
+
+function updateClock(){
+  const n=new Date();
+  document.getElementById('clk').textContent=
+    String(n.getHours()).padStart(2,'0')+':'+
+    String(n.getMinutes()).padStart(2,'0')+':'+
+    String(n.getSeconds()).padStart(2,'0');
+}
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape')closeModal();
+  if(e.key==='Enter'&&curTab==='man'&&
+     document.getElementById('modal').classList.contains('open'))addManual();
+});
+document.getElementById('modal').addEventListener('click',e=>{
+  if(e.target===document.getElementById('modal'))closeModal();
+});
+
+/* ══════════════════════════════════════════
+   BOOT
+══════════════════════════════════════════ */
+setupLock();
+render();
+updateClock();
+setInterval(()=>{render();updateClock();},1000);
+</script>
+</body>
+</html>
